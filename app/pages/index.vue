@@ -36,7 +36,7 @@
                 <div class="flex flex-col gap-3">
                     <div
                         class="color bg-linear-to-br from-warning/20 to-warning/5 rounded-xl p-2 w-fit flex items-center">
-                        <UIcon name="i-lucide-spell-check" class="size-12 text-primary " />
+                        <UIcon name="i-lucide-hexagon" class="size-12 text-primary " />
                     </div>
                     <h1 class="text-3xl">LexiBee</h1>
                     <p class="text-sm text-muted">
