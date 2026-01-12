@@ -1,16 +1,11 @@
 <script setup lang="ts">
-import solutions from '~/assets/words/solutions.json'
 import allowed from '~/assets/words/allowed.json'
+import solutions from '~/assets/words/solutions.json'
+import { useGameStore } from '~/stores/games'
 
-definePageMeta({
-    ssr: false
-})
+const gameStore = useGameStore()
 
 const allowedSet = new Set(allowed)
-
-const isValidWord = (word: string) => {
-    return
-}
 
 const START_DATE = new Date('2026-01-01')
 
@@ -23,19 +18,11 @@ function getDailySolution(date = new Date()) {
     return solutions[day % solutions.length]
 }
 
-
 const word = ref(['', '', '', '', ''])
-const guesses = [
-    { letters: ['', '', '', '', ''], active: true },
-    { letters: ['', '', '', '', ''], active: false },
-    { letters: ['', '', '', '', ''], active: false },
-    { letters: ['', '', '', '', ''], active: false },
-    { letters: ['', '', '', '', ''], active: false },
-    { letters: ['', '', '', '', ''], active: false }]
-const date = computed(() => new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }))
-const wordIsGuessed = ref(false)
 
-watch(word, v => console.log(v.join('')), { deep: true })
+const date = computed(() => new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }))
+const guessCount = computed(() => gameStore.wordQuestGuessCount)
+const wordIsGuessed = computed(() => gameStore.wordQuestHasGuessedDailyWord)
 
 const removeLetter = () => {
     for (let i = word.value.length - 1; i >= 0; i--) {
@@ -46,10 +33,30 @@ const removeLetter = () => {
     }
 }
 
+onMounted(() => {
+    console.log('solution: ', getDailySolution());
+
+})
+
 const submitGuess = () => {
-    const isValid = allowedSet.has(word.value.join('').toLowerCase())
+    console.log('enter pressed');
+
+    const guessedWord = word.value.join('').toLowerCase()
+    const isValid = allowedSet.has(guessedWord)
     const solution = getDailySolution()
 
+    if (isValid) {
+        word.value = Array(5).fill('', 0)
+
+        gameStore.incrementWordQuestGuessCount
+        gameStore.updatewordQuestGuesses(guessedWord)
+        if (guessedWord === solution) {
+            console.log('yippie');
+            gameStore.correctWordQuestGuess
+        } else {
+            console.log('oh no');
+        }
+    }
 }
 
 const addLetter = (newLetter: string) => {
@@ -62,7 +69,37 @@ const addLetter = (newLetter: string) => {
 const handleKey = (key: string) => {
     if (key === 'Enter') submitGuess()
     else if (key === 'Backspace') removeLetter()
-    else if (word.value.lastIndexOf('') !== -1) addLetter(key)
+    else addLetter(key)
+}
+
+const getLetters = (index: number) => {
+    const guesses = gameStore.wordQuestGuessList
+
+    let newIndex = index - 1
+
+    if (guesses[newIndex]) {
+        return guesses[newIndex].toLocaleUpperCase().split('')
+    } else {
+        return Array(5).fill('', 0)
+    }
+}
+
+const getBackgroundForWord = (wordIndex: number, letterIndex: number) => {
+    let newIndex = wordIndex - 1
+
+    const solution = getDailySolution()?.split('')
+
+    const letter = gameStore.wordQuestGuessList[newIndex]?.split('')[letterIndex]
+
+    if (letter && solution) {
+        if (letter === solution[letterIndex]) {
+            return 'bg-primary'
+        } else if (solution.indexOf(letter) !== -1) {
+            return 'bg-yellow-400'
+        }
+    }
+
+    return 'bg-accented'
 }
 
 </script>
@@ -73,9 +110,14 @@ const handleKey = (key: string) => {
         <p class="text-sm text-muted">Guess the word of the day in 6 or less guesses!</p>
     </div>
     <div class="flex flex-col items-center gap-2" v-if="!wordIsGuessed">
-        <div class="flex flex-row gap-2" v-for="guess in guesses">
-            <div class="bg-accented h-20 w-20 rounded-lg flex justify-center items-center text-5xl"
-                v-for="letter in word">
+        <div class="flex flex-row gap-2" v-for="wordIndex in 6">
+            <div class="bg-accented h-15 w-15 rounded-lg flex justify-center items-center text-5xl"
+                v-if="wordIndex === guessCount + 1" v-for="letter in word">
+                {{ letter }}
+            </div>
+            <div class="h-15 w-15 rounded-lg flex justify-center items-center text-5xl" v-else
+                v-for="(letter, letterIndex) in getLetters(wordIndex)"
+                :class="getBackgroundForWord(wordIndex, letterIndex)">
                 {{ letter }}
             </div>
         </div>
@@ -84,6 +126,6 @@ const handleKey = (key: string) => {
         </div>
     </div>
     <div v-else class="flex justify-center">
-        <h1>You've already completed the guess for {{ date }}</h1>
+        <h1>You've completed the guess for {{ date }}</h1>
     </div>
 </template>
