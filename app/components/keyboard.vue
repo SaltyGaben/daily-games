@@ -4,33 +4,32 @@ const KEYBOARD_ROWS = [
     ['A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L'],
     ['Enter', 'Z', 'X', 'C', 'V', 'B', 'N', 'M', 'Backspace']
 ]
-const priority = {
-    correct: 3,
-    present: 2,
-    absent: 1,
-    unused: 0
+
+onMounted(() => {
+    window.addEventListener("keydown", onKeyDown);
+});
+
+onBeforeUnmount(() => {
+    window.removeEventListener("keydown", onKeyDown);
+});
+
+const onKeyDown = (event: KeyboardEvent) => {
+    const key = event.key;
+    if (!/^(Enter|Backspace|[a-zA-Z])$/.test(key)) return
+
+    pressKey(key)
 }
+
 
 const emit = defineEmits(['key'])
-
-type KeyStatus = 'unused' | 'absent' | 'present' | 'correct'
-
-const keyStatuses = reactive<Record<string, KeyStatus>>({})
-
-const updateKeyboard = (guess: string, result: KeyStatus[]) => {
-    guess.split('').forEach((letter, i) => {
-        const next = result[i] as KeyStatus
-        const prev = keyStatuses[letter] ?? 'unused'
-
-        if (priority[next] > priority[prev]) {
-            keyStatuses[letter] = next
-        }
-    })
-}
+const props = defineProps<{
+    letterMap: Record<string, string>
+}>()
 
 function keyClass(key: string) {
     if (key.length > 1) return 'key special'
-    return `key ${keyStatuses[key] ?? 'unused'}`
+
+    return `key ${props.letterMap[key] ?? 'unused'}`
 }
 
 function label(key: string) {
