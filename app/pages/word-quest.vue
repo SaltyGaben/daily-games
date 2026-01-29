@@ -9,6 +9,27 @@ const allowedSet = new Set(allowed)
 
 const START_DATE = new Date('2026-01-01')
 
+const animateCell = reactive<{ row: number | null; index: number | null }>({
+    row: null,
+    index: null,
+})
+
+const rowAnimation = reactive<{ row: number | null; type: 'shake' | null }>({
+    row: null,
+    type: null,
+})
+
+const shouldAnimate = (row: number, index: number) => {
+    return animateCell.row === row && animateCell.index === index
+}
+
+const onCellAnimationEnd = (row: number, index: number) => {
+    if (animateCell.row === row && animateCell.index === index) {
+        animateCell.row = null
+        animateCell.index = null
+    }
+}
+
 const getDailySolution = (date = new Date()) => {
     const day =
         Math.floor(
@@ -22,7 +43,6 @@ const word = ref(['', '', '', '', ''])
 
 const date = computed(() => new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }))
 const guessCount = computed(() => gameStore.wordQuestGuessCount)
-const wordIsGuessed = computed(() => gameStore.wordQuestHasGuessedDailyWord)
 const isWordGuessedToday = computed(() => {
     const sortedHistory = [...gameStore.wordQuestGuessHistory].sort(
         (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
@@ -30,7 +50,12 @@ const isWordGuessedToday = computed(() => {
 
     const lastGuess = sortedHistory[sortedHistory.length - 1]
 
-    return lastGuess?.date === date.value
+    if (lastGuess?.date !== date.value) {
+        gameStore.wordQuestHasGuessedDailyWord = false
+        return false
+    }
+
+    return true
 })
 const letterMap = ref<Record<string, string>>({})
 
@@ -47,18 +72,31 @@ const submitGuess = () => {
     const guessedWord = word.value.join('').toLowerCase()
     const isValid = allowedSet.has(guessedWord)
     const solution = getDailySolution()
+    const currentRow = guessCount.value + 1
 
-    if (isValid) {
-        word.value = Array(5).fill('', 0)
+    if (!isValid) {
+        console.log("invalid word: ", guessedWord);
 
-        gameStore.incrementWordQuestGuessCount
-        gameStore.updatewordQuestGuesses(guessedWord)
+        rowAnimation.row = currentRow
+        rowAnimation.type = 'shake'
 
-        if (guessedWord === solution) {
-            gameStore.WordQuestGuessEndGame(guessedWord, true)
-        } else if (guessCount.value === 6) {
-            gameStore.WordQuestGuessEndGame(guessedWord, false)
-        }
+        setTimeout(() => {
+            rowAnimation.row = null
+            rowAnimation.type = null
+        }, 300)
+
+        return
+    }
+
+    word.value = Array(5).fill('', 0)
+
+    gameStore.incrementWordQuestGuessCount
+    gameStore.updatewordQuestGuesses(guessedWord)
+
+    if (guessedWord === solution) {
+        gameStore.WordQuestGuessEndGame(guessedWord, true)
+    } else if (guessCount.value === 6) {
+        gameStore.WordQuestGuessEndGame(guessedWord, false)
     }
 }
 
@@ -67,6 +105,8 @@ const addLetter = (newLetter: string) => {
     if (index !== -1) {
         word.value[index] = newLetter
     }
+    animateCell.row = guessCount.value + 1
+    animateCell.index = index
 }
 
 const handleKey = (key: string) => {
@@ -109,6 +149,7 @@ const getBackgroundForWord = (wordIndex: number, letterIndex: number) => {
     return 'bg-accented'
 }
 
+
 </script>
 
 <template>
@@ -118,26 +159,100 @@ const getBackgroundForWord = (wordIndex: number, letterIndex: number) => {
             <p class="text-sm text-muted">Guess the word of the day in 6 or less guesses!</p>
         </div>
         <div class="flex flex-col items-center gap-2">
-            <div class="flex flex-row gap-2" v-for="wordIndex in 6">
-                <div class="bg-accented h-15 w-15 rounded-lg flex justify-center items-center text-5xl"
-                    v-if="wordIndex === guessCount + 1" v-for="letter in word">
-                    {{ letter }}
-                </div>
-                <div class="h-15 w-15 rounded-lg flex justify-center items-center text-5xl" v-else
-                    v-for="(letter, letterIndex) in getLetters(wordIndex)"
-                    :class="getBackgroundForWord(wordIndex, letterIndex)">
-                    {{ letter }}
+            <div class="flex flex-row gap-2" v-for="wordIndex in 6" :key="wordIndex">
+                <div v-for="letterIndex in 5" :key="letterIndex"
+                    class="h-15 w-15 rounded-lg flex justify-center items-center text-5xl" :class="[
+                        wordIndex === guessCount + 1
+                            ? 'bg-accented'
+                            : getBackgroundForWord(wordIndex, letterIndex - 1),
+                        shouldAnimate(wordIndex, letterIndex - 1) ? 'animate-pop' : '',
+                        rowAnimation.row === wordIndex && rowAnimation.type === 'shake' ? 'animate-shake' : ''
+                    ]" @animationend="onCellAnimationEnd(wordIndex, letterIndex - 1)">
+                    <span v-if="wordIndex === guessCount + 1">
+                        {{ word[letterIndex - 1] }}
+                    </span>
+                    <span v-else>
+                        {{ getLetters(wordIndex)[letterIndex - 1] }}
+                    </span>
                 </div>
             </div>
-            <div class="mt-8" v-if="!wordIsGuessed">
+            <div class="mt-8">
                 <Keyboard @key="handleKey" :letter-map="letterMap" />
             </div>
         </div>
     </div>
     <div class="h-full flex flex-col justify-center items-center gap-4" v-else>
         <h1 class="text-4xl font-bold">{{ getDailySolution()?.toUpperCase() }}</h1>
-        <HistoryCard />
+        <StatisticsCard />
         <h1>You've completed the guess for {{ date }}</h1>
     </div>
-
 </template>
+
+<style scoped>
+@keyframes pop {
+    0% {
+        transform: scale(0.85);
+        opacity: 0.6;
+    }
+
+    50% {
+        transform: scale(1.12);
+        opacity: 1;
+    }
+
+    100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+.animate-pop {
+    animation: pop 200ms cubic-bezier(.2, .8, .3, 1) both;
+    transform-origin: center;
+}
+
+@keyframes shake {
+    0% {
+        transform: translateX(0);
+    }
+
+    15% {
+        transform: translateX(-8px);
+    }
+
+    30% {
+        transform: translateX(8px);
+    }
+
+    45% {
+        transform: translateX(-6px);
+    }
+
+    60% {
+        transform: translateX(6px);
+    }
+
+    75% {
+        transform: translateX(-3px);
+    }
+
+    100% {
+        transform: translateX(0);
+    }
+}
+
+.animate-shake {
+    background: var(--color-red-500);
+    animation: shake 300ms cubic-bezier(.36, .07, .19, .97);
+}
+
+/* respect reduced motion preference */
+@media (prefers-reduced-motion: reduce) {
+
+    .animate-shake,
+    .animate-pop {
+        animation: none;
+        transform: none;
+    }
+}
+</style>

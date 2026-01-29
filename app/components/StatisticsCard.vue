@@ -38,7 +38,7 @@ const barWidth = (value: number | undefined) => {
     <UCard v-if="statistics" variant="soft">
         <div class="grid grid-cols-2">
             <p>Games: {{ statistics.playedGames }}</p>
-            <p>Win %: {{ statistics.winPercentage }}%</p>
+            <p>Win%: {{ statistics.winPercentage }}%</p>
             <p>Max Streak: {{ statistics.maxStreak }}</p>
             <p>Current Streak: {{ statistics.currentStreak }}</p>
         </div>

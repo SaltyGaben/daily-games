@@ -19,5 +19,8 @@ export default defineNuxtConfig({
     "/word-quest": {
       ssr: false,
     },
+    "/lexibee": {
+      ssr: false,
+    },
   },
 });
